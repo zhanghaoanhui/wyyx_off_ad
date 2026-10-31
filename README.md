@@ -1,82 +1,105 @@
-# 网易严选 · 去开屏广告（Quantumult X）
+# 网易严选 · 去开屏广告
 
-基于 **2026-10-26 网易严选 iOS 9.7.6 抓包**整理的开屏广告重写。
+基于 **2026-10-31 Loon 抓包、网易严选 iOS 9.7.8** 整理的开屏广告屏蔽配置，同时提供 **Loon 插件** 与 **Quantumult X 重写**。
 
-冷启动时网易严选会请求 `getBootMedia.json` 拉取开屏推广素材（图片 / 视频 + 跳转 scheme），
-本重写把这份素材清空，App 启动后不再展示推广开屏，直接进入首页。
+冷启动时网易严选会请求 `getBootMedia.json` 拉取开屏推广素材（大图 / 视频 + 活动页跳转 scheme），本配置把素材字段清空，App 拿不到开屏素材，启动直接进入首页。
 
 ## 效果
 
-- 去掉冷启动的开屏推广图 / 视频，不再有「前往查看」跳转
-- 不拦截 `yanxuan.nosdn.127.net` 等图片域名，商品图、首页配图不受影响
-- 不修改版本更新字段，正常升级提示保留
-- 脚本解析失败时原样放行，不会把接口弄坏
+- 去掉冷启动的开屏推广图 / 开屏视频，不再出现「立即抢购」跳转
+- 只改写 `support.you.163.com` 上的两个 JSON 接口，**不拦截图片 CDN**，商品图、首页配图、详情页均不受影响
+- 保留版本更新相关字段，正常升级提示不受影响
+- 接口解析异常时原样放行，不会把接口弄坏
 
 ## 抓包依据
 
 | 接口 | 作用 | 处理 |
 | --- | --- | --- |
-| `GET https://support.you.163.com/xhr/boot/getBootMedia.json` | 返回 `data.bootPic`（开屏大图、`schemeUrl` 活动页跳转）、`data.bootVideo` | `bootPic` / `bootVideo` 置空 |
-| `GET https://support.you.163.com/appversync/check.do` | 返回 `data.wel_data`（旧版欢迎页 / 开屏数据） | `wel_data` 置空，保留更新字段 |
+| `GET https://support.you.163.com/xhr/boot/getBootMedia.json` | 返回 `data.bootPic`（开屏大图、`schemeUrl` 活动页跳转）、`data.bootVideo`（开屏视频） | `bootPic` / `bootVideo` / `firstPublishLogoUrl` 置空，其余字段保留 |
+| `GET https://support.you.163.com/appversync/check.do` | 返回 `data.wel_data`（旧版欢迎页 / 开屏数据），本次抓包为 `null` | `wel_data` 置空，保留更新字段（兜底） |
 
-抓包中一次启动连续请求了 3 次 `getBootMedia.json`，返回 3 个不同的推广素材（A/B 测试），
-所以脚本对这个接口直接返回「无素材」的合法响应，而不是只屏蔽某一张图。
+一次冷启动内 `getBootMedia.json` 被请求了 **3 次**，每次都返回不同的推广素材（A/B 投放，图片为 `yanxuan.nosdn.127.net/static-union/...`，全屏 1284×2778）。
+所以脚本按「清空素材字段」处理，而不是只屏蔽某一张图——否则换一次素材广告又回来了。
 
-> 首页弹窗 `m.you.163.com/activity/popWindow` 属于站内营销弹窗，不是开屏，本仓库未处理，避免影响首页正常加载。
+## 安装（Loon）
 
-## 安装
+### 方式一：一键导入插件（推荐）
 
-### 方式一：引用远程重写（推荐）
-
-1. 打开 Quantumult X → **重写** → **引用** → 右上角 `+`
-2. 填入：
-
-   ```
-   https://raw.githubusercontent.com/zhanghaoanhui/wyyx_off_ad/main/wyyx_off_ad.conf
-   ```
-
-3. 回到重写页，确认该引用已启用
-4. **设置 → MitM** → 生成证书 → 安装证书 → 在 iOS「设置 → 通用 → 关于本机 → 证书信任设置」中信任
-5. 确认 MitM 的 hostname 中包含 `support.you.163.com`
-6. 从后台完全划掉网易严选，重新冷启动
-
-### 方式二：手动添加
-
-在 Quantumult X 的 `[rewrite_local]` 中加入：
+在 Loon 里打开下面链接即可导入：
 
 ```
-^https:\/\/support\.you\.163\.com\/xhr\/boot\/getBootMedia\.json url script-response-body https://raw.githubusercontent.com/zhanghaoanhui/wyyx_off_ad/main/wyyx_off_ad.js
-^https:\/\/support\.you\.163\.com\/appversync\/check\.do url script-response-body https://raw.githubusercontent.com/zhanghaoanhui/wyyx_off_ad/main/wyyx_off_ad.js
+loon://import?plugin=https%3A%2F%2Fraw.githubusercontent.com%2Fzhanghaoanhui%2Ffuck_ad%2Fmain%2Fwyyx%2Fwyyx_off_ad.plugin
 ```
 
-在 `[mitm]` 的 hostname 中加入：
+或手动：Loon → **配置** → **插件** → 右上角 `+` → 粘贴
 
 ```
-support.you.163.com
+https://raw.githubusercontent.com/zhanghaoanhui/fuck_ad/main/wyyx/wyyx_off_ad.plugin
 ```
+
+### 方式二：手动添加脚本
+
+Loon 配置文件的 `[Script]` 段加入：
+
+```
+http-response ^https:\/\/support\.you\.163\.com\/xhr\/boot\/getBootMedia\.json(\?|$) script-path=https://raw.githubusercontent.com/zhanghaoanhui/fuck_ad/main/wyyx/wyyx_off_ad.js, requires-body=true, timeout=10, tag=严选-开屏素材
+http-response ^https:\/\/support\.you\.163\.com\/appversync\/check\.do(\?|$) script-path=https://raw.githubusercontent.com/zhanghaoanhui/fuck_ad/main/wyyx/wyyx_off_ad.js, requires-body=true, timeout=10, tag=严选-欢迎页
+```
+
+`[MITM]` 段加入：
+
+```
+hostname = support.you.163.com
+```
+
+### 收尾（两种方式都要做）
+
+1. **证书**：Loon → 设置 → MitM → 生成证书 → 安装描述文件 → 到 iOS「设置 → 通用 → 关于本机 → 证书信任设置」里打开信任
+2. **确认脚本已启用**（插件页开关为开）
+3. 从后台完全划掉网易严选，重新冷启动
+
+## 安装（Quantumult X）
+
+重写 → 引用 → `+`，填入：
+
+```
+https://raw.githubusercontent.com/zhanghaoanhui/fuck_ad/main/wyyx/wyyx_off_ad.conf
+```
+
+并在 MitM 的 hostname 中包含 `support.you.163.com`，证书同样需要安装并信任。
 
 ## 文件说明
 
 | 文件 | 说明 |
 | --- | --- |
-| `wyyx_off_ad.js` | 响应体重写脚本，处理上面两个接口 |
-| `wyyx_off_ad.conf` | Quantumult X 重写配置（含 `[rewrite_local]` 与 `[mitm]`） |
+| `wyyx/wyyx_off_ad.plugin` | **Loon 插件**，含 `[Script]` 与 `[MITM]` |
+| `wyyx/wyyx_off_ad.conf` | Quantumult X 重写配置，含 `[rewrite_local]` 与 `[mitm]` |
+| `wyyx/wyyx_off_ad.js` | 响应体脚本，Loon / Quantumult X 通用（同一套 `$request` / `$response` / `$done` 接口） |
 
-## 常见问题
+## 实现细节
 
-**装完还有开屏？**
+- 在**原始响应**上就地清空字段，`code`、`newDevice`、`needRookieGuide`、`allowSkipRookieGuide`、`videoEffect` 等字段原样保留，接口结构不变
+- 只有响应体解析失败时，才退回一份「无素材」的最小合法响应（字段与真实返回一致）
+- 非 200 响应不加工，避免把错误页替换成看起来正常的业务数据
+- 非目标 URL、任何异常 → `$done({})` 原样放行
 
-- 确认 MitM 证书已安装并信任，且 `support.you.163.com` 在 hostname 列表里
-- 确认重写引用处于启用状态，然后彻底杀掉 App 再冷启动
-- 部分版本开屏有本地缓存，首次可多启动一两次；若长期无效，说明接口有变，欢迎带抓包提 issue
+## 排查
 
-**会影响商品图片吗？**
+装完还有开屏，按顺序检查：
 
-不会。脚本只改写 `support.you.163.com` 上的两个 JSON 接口，不触碰图片 CDN。
+1. MitM 证书已安装且**已信任**，`support.you.163.com` 在 hostname 列表里
+2. 插件 / 重写引用处于启用状态
+3. 彻底杀掉 App 再冷启动（从后台划掉，不是回桌面）
+4. 开屏素材有本地缓存，首次可多冷启动一两次
+5. 仍无效说明接口有变化，欢迎带抓包提 issue
 
-**Surge / Loon 能用吗？**
+## 已知未处理
 
-脚本按 Quantumult X 的 `$response.body` / `$done({ body })` 写法编写，其它客户端需要按各自 API 调整。
+以下不是开屏广告，本仓库有意不处理，避免影响正常功能：
+
+- 首页弹窗 `m.you.163.com/activity/popWindow`（站内 CRM 营销弹窗，reject 后 WebView 会白屏）
+- H5 页面内的运营 banner（`static-union/...1224y262` 等），属于页面内容，屏蔽会破坏排版
+- 统计 / 埋点（`log.zijieapi.com`、`h.trace.qq.com`、`ahb.you.163.com` 等），属于上报而非广告展示
 
 ## 免责声明
 

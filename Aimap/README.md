@@ -5,7 +5,7 @@ Loon 插件版，由 [@ddgksf2013](https://github.com/ddgksf2013) 的 `AmapAds.c
 ## 插件地址
 
 ```
-https://raw.githubusercontent.com/zhanghaoanhui/fuck_ad/main/高德地图/amap_off_ad.plugin
+https://raw.githubusercontent.com/zhanghaoanhui/fuck_ad/main/Aimap/amap_off_ad.plugin
 ```
 
 Loon → 配置 → 插件 → 添加，粘贴上面的地址即可。

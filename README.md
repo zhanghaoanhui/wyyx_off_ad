@@ -101,6 +101,20 @@ https://raw.githubusercontent.com/zhanghaoanhui/fuck_ad/main/wyyx/wyyx_off_ad.co
 - H5 页面内的运营 banner（`static-union/...1224y262` 等），属于页面内容，屏蔽会破坏排版
 - 统计 / 埋点（`log.zijieapi.com`、`h.trace.qq.com`、`ahb.you.163.com` 等），属于上报而非广告展示
 
+## 国内网络拉不到 raw.githubusercontent.com？
+
+Loon 下载插件和脚本走它自己的网络栈，如果 `raw.githubusercontent.com` 直连失败，任选其一：
+
+1. 在 Loon 里给 `raw.githubusercontent.com` 配一条走代理的规则，例如 `DOMAIN,raw.githubusercontent.com,PROXY`
+2. 或改用 jsDelivr 镜像（插件与脚本都可换域名，路径不变）：
+
+   ```
+   https://cdn.jsdelivr.net/gh/zhanghaoanhui/fuck_ad@main/wyyx/wyyx_off_ad.plugin
+   https://cdn.jsdelivr.net/gh/zhanghaoanhui/fuck_ad@main/wyyx/wyyx_off_ad.js
+   ```
+
+   用镜像时，记得把插件 `[Script]` 里的两处 `script-path=` 一并换成上面的 js 地址（jsDelivr 对 `@main` 有缓存，改动后可能延迟几小时生效）。
+
 ## 免责声明
 
 仅供学习与交流使用，请勿用于商业用途。屏蔽广告会影响 App 的推广收入，是否使用请自行权衡。

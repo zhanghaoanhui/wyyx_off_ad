@@ -1,11 +1,12 @@
-#!name=网易严选 去开屏广告
-#!desc=清空开屏推广素材（bootPic / bootVideo），冷启动直接进首页
+#!name=网易严选 去开屏广告 / CRM 弹窗
+#!desc=清空开屏推广素材与「我的」页 CRM 营销弹窗，冷启动直接进首页
 #!author=zhanghaoanhui
 #!homepage=https://github.com/zhanghaoanhui/fuck_ad
 
 [Script]
 http-response ^https:\/\/support\.you\.163\.com\/xhr\/boot\/getBootMedia\.json(\?|$) script-path=https://raw.githubusercontent.com/zhanghaoanhui/fuck_ad/main/wyyx/wyyx_off_ad.js, requires-body=true, timeout=10, tag=严选-开屏素材
 http-response ^https:\/\/support\.you\.163\.com\/appversync\/check\.do(\?|$) script-path=https://raw.githubusercontent.com/zhanghaoanhui/fuck_ad/main/wyyx/wyyx_off_ad.js, requires-body=true, timeout=10, tag=严选-欢迎页
+http-response ^https:\/\/m\.you\.163\.com\/activity\/popWindow(\?|$) script-path=https://raw.githubusercontent.com/zhanghaoanhui/fuck_ad/main/wyyx/wyyx_off_ad.js, requires-body=true, timeout=10, tag=严选-CRM弹窗
 
 [MITM]
-hostname = support.you.163.com
+hostname = support.you.163.com, m.you.163.com

@@ -1,13 +1,17 @@
-# 网易严选 · 去开屏广告
+# 网易严选 · 去开屏广告 / CRM 弹窗
 
-基于 **2026-10-31 Loon 抓包、网易严选 iOS 9.7.8** 整理的开屏广告屏蔽配置，同时提供 **Loon 插件** 与 **Quantumult X 重写**。
+基于 **2026-10-31 Loon 抓包、网易严选 iOS 9.7.8** 整理的广告屏蔽配置，同时提供 **Loon 插件** 与 **Quantumult X 重写**。
 
-冷启动时网易严选会请求 `getBootMedia.json` 拉取开屏推广素材（大图 / 视频 + 活动页跳转 scheme），本配置把素材字段清空，App 拿不到开屏素材，启动直接进入首页。
+两处广告：
+
+- **开屏广告**：冷启动请求 `getBootMedia.json` 拉取推广素材（大图 / 视频 + 活动页跳转 scheme），清空素材后 App 直接进首页
+- **CRM 营销弹窗**：进「我的」时加载 `activity/popWindow` 弹窗页，清空页面内联的弹窗数据后不再弹出
 
 ## 效果
 
 - 去掉冷启动的开屏推广图 / 开屏视频，不再出现「立即抢购」跳转
-- 只改写 `support.you.163.com` 上的两个 JSON 接口，**不拦截图片 CDN**，商品图、首页配图、详情页均不受影响
+- 去掉「我的」页的 CRM 营销弹窗（大图 + 领券按钮），且不会留下白屏
+- 只改写 `support.you.163.com`、`m.you.163.com` 上的三个接口，**不拦截图片 CDN**，商品图、首页配图、详情页均不受影响
 - 保留版本更新相关字段，正常升级提示不受影响
 - 接口解析异常时原样放行，不会把接口弄坏
 
@@ -17,9 +21,20 @@
 | --- | --- | --- |
 | `GET https://support.you.163.com/xhr/boot/getBootMedia.json` | 返回 `data.bootPic`（开屏大图、`schemeUrl` 活动页跳转）、`data.bootVideo`（开屏视频） | `bootPic` / `bootVideo` / `firstPublishLogoUrl` 置空，其余字段保留 |
 | `GET https://support.you.163.com/appversync/check.do` | 返回 `data.wel_data`（旧版欢迎页 / 开屏数据），本次抓包为 `null` | `wel_data` 置空，保留更新字段（兜底） |
+| `GET https://m.you.163.com/activity/popWindow` | CRM 营销弹窗页，服务端把弹窗数据内联为 `var popWindow={...}`（`picUrl` 大图、`buttonUrl` 领券/活动跳转） | 内联数据改为 `var popWindow={};` |
 
 一次冷启动内 `getBootMedia.json` 被请求了 **3 次**，每次都返回不同的推广素材（A/B 投放，图片为 `yanxuan.nosdn.127.net/static-union/...`，全屏 1284×2778）。
 所以脚本按「清空素材字段」处理，而不是只屏蔽某一张图——否则换一次素材广告又回来了。
+
+弹窗页同理：它把活动数据直接内联在 HTML 里，页面 JS（`crmPop/index-*.page-min.js`）读取 `window.popWindow` 决定是否渲染：
+
+```js
+if (!isEmpty(window.popWindow)) { t = 1; ReactDOM.render(弹窗组件) }
+_$ready(function () { _$setPopWindowShow({ show: t }) })
+```
+
+把数据清成 `{}` 后走的就是页面自身的「无活动数据」分支：不渲染弹窗、不加载弹窗大图，只向原生发 `show:0`。
+这比 `reject` 直接断请求更好——后者会让 WebView 加载失败，容易留下白屏。
 
 ## 安装（Loon）
 
@@ -44,12 +59,13 @@ Loon 配置文件的 `[Script]` 段加入：
 ```
 http-response ^https:\/\/support\.you\.163\.com\/xhr\/boot\/getBootMedia\.json(\?|$) script-path=https://raw.githubusercontent.com/zhanghaoanhui/fuck_ad/main/wyyx/wyyx_off_ad.js, requires-body=true, timeout=10, tag=严选-开屏素材
 http-response ^https:\/\/support\.you\.163\.com\/appversync\/check\.do(\?|$) script-path=https://raw.githubusercontent.com/zhanghaoanhui/fuck_ad/main/wyyx/wyyx_off_ad.js, requires-body=true, timeout=10, tag=严选-欢迎页
+http-response ^https:\/\/m\.you\.163\.com\/activity\/popWindow(\?|$) script-path=https://raw.githubusercontent.com/zhanghaoanhui/fuck_ad/main/wyyx/wyyx_off_ad.js, requires-body=true, timeout=10, tag=严选-CRM弹窗
 ```
 
 `[MITM]` 段加入：
 
 ```
-hostname = support.you.163.com
+hostname = support.you.163.com, m.you.163.com
 ```
 
 ### 收尾（两种方式都要做）
@@ -66,7 +82,7 @@ hostname = support.you.163.com
 https://raw.githubusercontent.com/zhanghaoanhui/fuck_ad/main/wyyx/wyyx_off_ad.conf
 ```
 
-并在 MitM 的 hostname 中包含 `support.you.163.com`，证书同样需要安装并信任。
+并在 MitM 的 hostname 中包含 `support.you.163.com` 与 `m.you.163.com`，证书同样需要安装并信任。
 
 ## 文件说明
 
@@ -79,25 +95,26 @@ https://raw.githubusercontent.com/zhanghaoanhui/fuck_ad/main/wyyx/wyyx_off_ad.co
 ## 实现细节
 
 - 在**原始响应**上就地清空字段，`code`、`newDevice`、`needRookieGuide`、`allowSkipRookieGuide`、`videoEffect` 等字段原样保留，接口结构不变
+- 弹窗页只替换那一段内联数据，其余 HTML / 引用的 JS 一字不改；用括号配对扫描定位，字符串里的 `{}`、转义引号都不会被误伤
 - 只有响应体解析失败时，才退回一份「无素材」的最小合法响应（字段与真实返回一致）
+- 弹窗页结构变化（找不到 `var popWindow`）时原样放行，不猜着改
 - 非 200 响应不加工，避免把错误页替换成看起来正常的业务数据
 - 非目标 URL、任何异常 → `$done({})` 原样放行
 
 ## 排查
 
-装完还有开屏，按顺序检查：
+装完还有开屏 / 弹窗，按顺序检查：
 
-1. MitM 证书已安装且**已信任**，`support.you.163.com` 在 hostname 列表里
+1. MitM 证书已安装且**已信任**，`support.you.163.com`、`m.you.163.com` 都在 hostname 列表里
 2. 插件 / 重写引用处于启用状态
 3. 彻底杀掉 App 再冷启动（从后台划掉，不是回桌面）
-4. 开屏素材有本地缓存，首次可多冷启动一两次
+4. 开屏素材和弹窗都有本地缓存，首次可多冷启动一两次
 5. 仍无效说明接口有变化，欢迎带抓包提 issue
 
 ## 已知未处理
 
-以下不是开屏广告，本仓库有意不处理，避免影响正常功能：
+以下不属于这两处广告，本仓库有意不处理，避免影响正常功能：
 
-- 首页弹窗 `m.you.163.com/activity/popWindow`（站内 CRM 营销弹窗，reject 后 WebView 会白屏）
 - H5 页面内的运营 banner（`static-union/...1224y262` 等），属于页面内容，屏蔽会破坏排版
 - 统计 / 埋点（`log.zijieapi.com`、`h.trace.qq.com`、`ahb.you.163.com` 等），属于上报而非广告展示
 
@@ -113,7 +130,7 @@ Loon 下载插件和脚本走它自己的网络栈，如果 `raw.githubuserconte
    https://cdn.jsdelivr.net/gh/zhanghaoanhui/fuck_ad@main/wyyx/wyyx_off_ad.js
    ```
 
-   用镜像时，记得把插件 `[Script]` 里的两处 `script-path=` 一并换成上面的 js 地址（jsDelivr 对 `@main` 有缓存，改动后可能延迟几小时生效）。
+   用镜像时，记得把插件 `[Script]` 里的三处 `script-path=` 一并换成上面的 js 地址（jsDelivr 对 `@main` 有缓存，改动后可能延迟几小时生效）。
 
 ## 免责声明
 

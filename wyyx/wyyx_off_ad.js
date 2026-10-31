@@ -1,12 +1,12 @@
 /*
- * 网易严选 · 去开屏广告
+ * 网易严选 · 去开屏广告 / CRM 弹窗
  * Loon / Quantumult X 共用的响应体脚本（$request / $response / $done 三件套）
  *
  * 仓库：https://github.com/zhanghaoanhui/fuck_ad
  *
  * 抓包依据：Loon 抓包 2026-10-31，网易严选 iOS 9.7.8
  *
- * 处理的两个接口：
+ * 处理的三个接口：
  *   1. GET https://support.you.163.com/xhr/boot/getBootMedia.json
  *        data.bootPic   —— 开屏大图 + schemeUrl 活动页跳转
  *        data.bootVideo —— 开屏视频（本次抓包为 null）
@@ -14,9 +14,15 @@
  *      所以按「清空素材字段」处理，而不是只屏蔽某一张图。
  *   2. GET https://support.you.163.com/appversync/check.do
  *        data.wel_data  —— 旧版本欢迎页 / 开屏数据（本次抓包为 null，做兜底）
+ *   3. GET https://m.you.163.com/activity/popWindow
+ *        CRM 营销弹窗页（进「我的」时弹出）。服务端把弹窗数据内联在页面里：
+ *        var popWindow={"picUrl":...,"buttonUrl":...};
+ *        页面 JS 读取它决定是否展示；清成 {} 后就走自身的「无活动数据」分支：
+ *        不渲染弹窗、不发起 setPopWindowShow({show:1})，只发 show:0。
+ *        既没有弹窗，也不会留白屏（页面本身的行为，不是 reject 硬断）。
  *
  * 设计原则：
- *   - 只改写这两个 JSON 接口，不拦截 yanxuan.nosdn.127.net 图片 CDN，
+ *   - 只改写这三个营销接口，不拦截 yanxuan.nosdn.127.net 图片 CDN，
  *     商品图、首页配图、详情页图片都不受影响；
  *   - 在原始响应上就地清空字段，保留 code / newDevice / needRookieGuide 等其它字段，
  *     不破坏接口结构，也不碰版本更新相关字段；
@@ -30,6 +36,7 @@
 
   var RE_BOOT = /\/xhr\/boot\/getBootMedia\.json(\?|$)/;
   var RE_WELCOME = /\/appversync\/check\.do(\?|$)/;
+  var RE_POPUP = /\/activity\/popWindow(\?|$)/;
 
   function send(obj) {
     $done({ body: JSON.stringify(obj) });
@@ -68,6 +75,43 @@
     }
   }
 
+  // 从 start（必须是 '{'）开始找配对的 '}'，跳过字符串里的括号与转义
+  function findObjectEnd(text, start) {
+    var depth = 0;
+    var quote = '';
+    var escaped = false;
+    for (var k = start; k < text.length; k++) {
+      var ch = text.charAt(k);
+      if (quote) {
+        if (escaped) { escaped = false; }
+        else if (ch === '\\') { escaped = true; }
+        else if (ch === quote) { quote = ''; }
+        continue;
+      }
+      if (ch === '"' || ch === "'") { quote = ch; continue; }
+      if (ch === '{') { depth++; }
+      else if (ch === '}') {
+        depth--;
+        if (depth === 0) return k;
+      }
+    }
+    return -1;
+  }
+
+  // 把页面内联的弹窗数据换成空对象，其它 HTML 一字不改
+  function stripPopupData(html) {
+    var anchor = html.indexOf('var popWindow');
+    if (anchor < 0) return null;
+    var start = html.indexOf('{', anchor);
+    if (start < 0) return null;
+    var end = findObjectEnd(html, start);
+    if (end < 0) return null;
+    var tail = end + 1;
+    while (tail < html.length && /\s/.test(html.charAt(tail))) tail++;
+    if (html.charAt(tail) === ';') tail++;
+    return html.slice(0, anchor) + 'var popWindow = {};' + html.slice(tail);
+  }
+
   try {
     // 失败响应不加工，避免把错误页替换成看起来正常的业务数据
     if (status && status !== 200) {
@@ -93,6 +137,17 @@
         if ('firstPublishLogoUrl' in wel.data) wel.data.firstPublishLogoUrl = null;
         send(wel);
       } else {
+        $done({});
+      }
+      return;
+    }
+
+    if (RE_POPUP.test(url)) {
+      var page = typeof body === 'string' ? stripPopupData(body) : null;
+      if (page) {
+        $done({ body: page });
+      } else {
+        // 页面结构变了就原样放行，不去猜着改，避免把弹窗页改坏
         $done({});
       }
       return;

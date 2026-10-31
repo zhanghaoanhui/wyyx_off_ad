@@ -1,0 +1,32 @@
+#!name=高德地图 去广告净化（墨鱼版）
+#!desc=去除开屏广告、首页信息流与顶部推广、搜索热词、左下天气、路线规划广告，并清理底部角标、附近页与打车页推广
+#!author=@ddgksf2013（Loon 适配：zhanghaoanhui）
+#!homepage=https://github.com/zhanghaoanhui/fuck_ad
+
+[Rule]
+HOST-SUFFIX,optimus-ads.amap.com,DIRECT
+
+[Rewrite]
+^https?:\/\/.*\.amap\.com\/ws\/aos\/alimama\/splash_screen url reject-200
+^https?:\/\/.*\.amap\.com\/v\d\/ai_rec\/ url reject-dict
+^https?:\/\/.*\.amap\.com\/ws\/faas\/amap-navigation\/card-service-route-plan\? url reject-dict
+^https?:\/\/.*\.amap\.com\/ws\/boss\/order_web\/\w{8}_information url reject-200
+^https?:\/\/.*\.amap\.com\/ws\/asa\/ads_attribution url reject
+^https?:\/\/.*\.amap\.com\/ws\/shield\/scene\/recommend url reject-dict
+^https?:\/\/.*\.amap\.com\/uploadimg\/\w+\.gif url reject-img
+^https?:\/\/.*\.amap\.com\/ws\/valueadded\/weather url reject-dict
+
+[Script]
+http-response ^http:\/\/amdc\.m\.taobao\.com script-path=https://raw.githubusercontent.com/ddgksf2013/Scripts/refs/heads/master/amdc.js, requires-body=true, timeout=30, tag=高德-amdc处理
+http-response ^https?:\/\/.*\.amap\.com\/ws\/message\/notice\/list script-path=https://raw.githubusercontent.com/ddgksf2013/Scripts/refs/heads/master/amap.js, requires-body=true, timeout=30, tag=高德-底部角标
+http-response ^https?:\/\/.*\.amap\.com\/ws\/shield\/frogserver\/aocs\/updatable script-path=https://raw.githubusercontent.com/ddgksf2013/Scripts/refs/heads/master/amap.js, requires-body=true, timeout=30, tag=高德-首页右中广告
+http-response ^https?:\/\/.*\.amap\.com\/ws\/shield\/search\/nearbyrec_smart script-path=https://raw.githubusercontent.com/ddgksf2013/Scripts/refs/heads/master/amap.js, requires-body=true, timeout=30, tag=高德-附近页面
+http-response ^https?:\/\/.*\.amap\.com\/ws\/promotion-web\/resource script-path=https://raw.githubusercontent.com/ddgksf2013/Scripts/refs/heads/master/amap.js, requires-body=true, timeout=30, tag=高德-打车页面
+http-response ^https?:\/\/.*\.amap\.com\/ws\/faas\/amap-navigation\/main-page script-path=https://raw.githubusercontent.com/ddgksf2013/Scripts/refs/heads/master/amap.js, requires-body=true, timeout=30, tag=高德-首页底部
+http-response ^https?:\/\/.*\.amap\.com\/ws\/valueadded\/alimama\/splash_screen script-path=https://raw.githubusercontent.com/ddgksf2013/Scripts/refs/heads/master/amap.js, requires-body=true, timeout=30, tag=高德-开屏广告
+http-response ^https?:\/\/.*\.amap\.com\/ws\/msgbox\/pull script-path=https://raw.githubusercontent.com/ddgksf2013/Scripts/refs/heads/master/amap.js, requires-body=true, timeout=30, tag=高德-首页顶部推广
+http-response ^https?:\/\/.*\.amap\.com\/ws\/shield\/dsp\/profile\/index\/nodefaas script-path=https://raw.githubusercontent.com/ddgksf2013/Scripts/refs/heads/master/amap.js, requires-body=true, timeout=30, tag=高德-我的页面
+http-response ^https?:\/\/.*\.amap\.com\/ws\/shield\/search\/new_hotword script-path=https://raw.githubusercontent.com/ddgksf2013/Scripts/refs/heads/master/amap.js, requires-body=true, timeout=30, tag=高德-搜索热词
+
+[MITM]
+hostname = %APPEND% m5.amap.com, m5-zb.amap.com, center.amap.com, amap-aos-info-nogw.amap.com, ai.amap.com
